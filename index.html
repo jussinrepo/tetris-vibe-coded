@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Vibe-coded Tetris — Almost oneshotting a browser puzzle game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{ --orange:#F69717; --ink:#0b0b0c; --bg:#0c0d10; --panel:#12141a; --grid:#1b1e26; --text:#f6f8ff; --muted:#9aa3b2; --white:#ffffff; }
+    *{box-sizing:border-box}
+    body{ margin:0; min-height:100svh; display:grid; place-items:center; background:
+      radial-gradient(1200px 800px at 20% -10%, rgba(246,151,23,0.10), transparent 60%),
+      radial-gradient(900px 700px at 110% 110%, rgba(246,151,23,0.06), transparent 60%),
+      linear-gradient(#0b0d12,#0a0b0f 50%, #0b0d12); color:var(--text);
+      font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+    .wrap{ display:grid; grid-template-columns:minmax(280px,320px) minmax(260px,320px); gap:22px; padding:24px; width:min(980px,95vw);} 
+    .hud{ background:var(--panel); border:1px solid #1e222b; border-radius:14px; padding:18px 16px; }
+    h1{ margin:0 0 8px; font-size:18px; letter-spacing:0.2px; display:flex;align-items:center;gap:10px; }
+    .badge{ display:inline-flex;align-items:center;gap:8px; padding:6px 10px;border-radius:999px; background:rgba(246,151,23,0.12); color:var(--white); border:1px solid rgba(246,151,23,0.35); text-decoration:none; }
+    .badge .dot{ width:10px;height:10px;border-radius:50%;background:var(--orange); box-shadow:0 0 0 2px rgba(246,151,23,0.25), 0 0 12px rgba(246,151,23,0.45);} 
+    .tagline{ margin:4px 0 12px;color:var(--muted);font-size:12px }
+    .stats{ display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 6px; }
+    .stat{ background:#0f1218;border:1px solid #1b2030;border-radius:10px;padding:10px; }
+    .stat h3{margin:0; font:600 11px/1.2 system-ui; color:#aeb7c6; text-transform:uppercase; letter-spacing:0.5px}
+    .stat .val{font:700 20px/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin-top:6px}
+    .controls{font-size:12px;color:#aab3c2}
+    #toggles{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .pill{ display:inline-flex;align-items:center;gap:6px; padding:4px 8px;border:1px solid #273044;border-radius:999px;background:#0e1220; color:#cbd4e4;font-size:12px; cursor:pointer }
+    .pill.on{border-color:rgba(246,151,23,0.55); box-shadow:0 0 0 2px rgba(246,151,23,0.18) inset}
+    .pill .led{width:8px;height:8px;border-radius:50%;background:#394254}
+    .pill.on .led{background:var(--orange);box-shadow:0 0 10px rgba(246,151,23,0.6)}
+    #board{ display:block; background:
+        linear-gradient(180deg, #0d1017 0%, #0b0d12 100%), #0b0d12;
+      border-radius:14px; border:1px solid #1c202a; box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.02);} 
+    .footer{margin-top:12px;color:#7d8796;font-size:12px}
+    .key{display:inline-block;padding:1px 6px;border:1px solid #30384a;border-radius:6px;color:#d7deea;background:#111420}
+    .notice{margin-top:10px;color:#96a3b7;font-size:12px}
+    .toast{ position:fixed;top:16px;left:50%;transform:translate(-50%,0);z-index:5; padding:10px 14px;border-radius:10px;background:#0e1320;border:1px solid #26304a; color:#e9f0ff;box-shadow:0 10px 30px rgba(0,0,0,.4) }
+    #fx{position:fixed;inset:0;pointer-events:none;background:transparent !important; z-index:2}
+  </style>
+</head>
+<body>
+  <canvas id="fx"></canvas>
+  <div class="wrap">
+    <div>
+      <canvas id="board" width="320" height="640"></canvas>
+    </div>
+    <aside class="hud">
+      <h1>Vibe-coded Tetris <a class="badge" href="https://github.com/jussinrepo/tetris-vibe-coded/" target="_blank" rel="noopener"><span class="dot" aria-hidden="true"></span> Github</a></h1>
+      <div class="tagline">Almost oneshotting a browser puzzle game.</div>
+      <div class="stats">
+        <div class="stat"><h3>Score</h3><div class="val" id="score">0</div></div>
+        <div class="stat"><h3>Lines</h3><div class="val" id="lines">0</div></div>
+        <div class="stat"><h3>Level</h3><div class="val" id="level">1</div></div>
+        <div class="stat"><h3>Next</h3><div class="val" id="next">I</div></div>
+      </div>
+      <div class="controls">
+        <p><span class="key">← →</span> move &nbsp; <span class="key">Z/X or ↑</span> rotate &nbsp; <span class="key">↓</span> soft drop &nbsp; <span class="key">Space</span> hard drop</p>
+        <p><span class="key">P</span> pause/resume &nbsp; <span class="key">R</span> restart &nbsp; <span class="key">G</span> Ghost Guide</p>
+        <div id="toggles">
+          <div class="pill on" id="ghostPill" title="Toggle Ghost Guide (G)"><span class="led"></span> Ghost Guide</div>
+          <div class="pill" id="aiPill" title="Toggle AI Assist (A then I)"><span class="led"></span> AI Assist</div>
+        </div>
+        <div class="notice">Konami code unlocks Spiral of Success.</div>
+      </div>
+      <div class="footer">Made for fun with GPT-5. Not one-shot, but 6th iteration here!</div>
+    </aside>
+  </div>
+  <div class="toast" id="toast" style="display:none"></div>
+
+<script>
+/* ==============================
+   Vibe-coded Tetris — single-file
+   Version: 1.0.6 (Ghost Guide toggle + UX)
+   ============================== */
+
+const $ = sel => document.querySelector(sel);
+const boardCanvas = $('#board');
+const fxCanvas = $('#fx');
+const ctx = boardCanvas.getContext('2d');
+const fx = fxCanvas.getContext('2d');
+const W = boardCanvas.width, H = boardCanvas.height;
+const COLS = 10, ROWS = 20, CELL = Math.floor(W / COLS);
+fxCanvas.width = innerWidth; fxCanvas.height = innerHeight;
+
+const COLOR = { 
+  ghost: 'rgba(255,255,255,0.20)',
+  grid: '#1b1e26',
+  // Piece indices in SHAPES: 1..7 for I,J,L,O,S,T,Z
+  blocks: [
+    '#2ABAD9', // I — blue
+    '#4F0077', // J — deep purple
+    '#98139C', // L — violet
+    '#D54328', // O — orange/red
+    '#45B649', // S — green
+    '#CB0084', // T — magenta
+    '#ECEFF0'  // Z — light neutral
+  ]
+};
+
+let grid = createMatrix(COLS, ROWS);
+let piece = null; let nextQueue = [];
+let score = 0, lines = 0, level = 1;
+let dropCounter = 0, dropInterval = 800; let lastTime = 0; let running = true;
+
+let showGhost = true; // NEW: ghost guide toggle
+let aiAssist = false; let konamiActive = false;
+const ghostPill = $('#ghostPill');
+const aiPill = $('#aiPill');
+function setGhost(on){ showGhost = on; ghostPill.classList.toggle('on', on); toast(on? 'Ghost Guide: ON' : 'Ghost Guide: OFF'); }
+
+function toast(msg, ms=1000){ const el = $('#toast'); el.textContent = msg; el.style.display='block'; el.style.opacity='1'; setTimeout(()=>{ el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(()=>{ el.style.display='none'; el.style.transition='';}, 450) }, ms); }
+
+const SHAPES = { I: [[1,1,1,1]], J: [[2,0,0],[2,2,2]], L: [[0,0,3],[3,3,3]], O: [[4,4],[4,4]], S: [[0,5,5],[5,5,0]], T: [[0,6,0],[6,6,6]], Z: [[7,7,0],[0,7,7]] };
+const ORDER = ['I','J','L','O','S','T','Z'];
+
+function rotCW(m){ const rows=m.length, cols=m[0].length; const out=Array.from({length:cols},()=>Array(rows).fill(0)); for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) out[x][rows-1-y]=m[y][x]; return out; }
+function rotCCW(m){ const rows=m.length, cols=m[0].length; const out=Array.from({length:cols},()=>Array(rows).fill(0)); for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) out[cols-1-x][y]=m[y][x]; return out; }
+function createMatrix(w,h){ const m=[]; while(h--) m.push(new Array(w).fill(0)); return m; }
+function collide(grid, piece){ const [m,o]=[piece.matrix,piece.pos]; for(let y=0;y<m.length;++y){ for(let x=0;x<m[y].length;++x){ if(m[y][x]!==0 && ((grid[y+o.y] && grid[y+o.y][x+o.x]) !== 0)) return true; } } return false; }
+function merge(grid, piece){ piece.matrix.forEach((row,y)=>row.forEach((v,x)=>{ if(v!==0) grid[y+piece.pos.y][x+piece.pos.x]=v; })) }
+function sweep(){ let rowCount=0; outer: for(let y=grid.length-1;y>=0;--y){ for(let x=0;x<grid[y].length;++x){ if(grid[y][x]===0) continue outer; } const row=grid.splice(y,1)[0].fill(0); grid.unshift(row); ++y; ++rowCount; if(konamiActive) confettiSpiral(); } if(rowCount>0){ const pts=[0,40,100,300,1200][rowCount]*level; score+=pts; lines+=rowCount; if(lines>=level*10) levelUp(); updateHUD(); } }
+function levelUp(){ level++; dropInterval=Math.max(120,800-(level-1)*60); toast('Level Up!'); }
+function bag(){ const a=ORDER.slice(); for(let i=a.length-1;i>0;--i){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function refill(){ if(nextQueue.length<7) nextQueue.push(...bag()); }
+function clampSpawn(p){ const width=p.matrix[0].length; if(p.pos.x<0) p.pos.x=0; if(p.pos.x>COLS-width) p.pos.x=COLS-width; let offset=0; while(collide(grid,p) && offset<COLS){ p.pos.x += (offset%2===0?1:-1) * (offset+1>1?1:0); if(p.pos.x<0) p.pos.x=0; if(p.pos.x>COLS-width) p.pos.x=COLS-width; offset++; } }
+function newPiece(){ refill(); const type=nextQueue.shift(); $('#next').textContent=nextQueue[0]||'·'; const m=SHAPES[type].map(r=>r.slice()); piece={type, matrix:m, pos:{x:Math.floor(COLS/2)-Math.ceil(m[0].length/2), y:0}}; clampSpawn(piece); if(collide(grid,piece)){ running=false; toast('Game Over — press R to restart', 2000); } }
+
+// --- Visual polish helpers: outline + shading ---
+function hexToRgb(hex){ hex=hex.replace('#',''); if(hex.length===3) hex = hex.split('').map(c=>c+c).join(''); const num=parseInt(hex,16); return {r:(num>>16)&255, g:(num>>8)&255, b:num&255}; }
+function rgbToCss(r,g,b,a=1){ return `rgba(${Math.max(0,Math.min(255,Math.round(r)))},${Math.max(0,Math.min(255,Math.round(g)))},${Math.max(0,Math.min(255,Math.round(b)))},${a})`; }
+function darken(hex, factor=0.7){ const {r,g,b}=hexToRgb(hex); return rgbToCss(r*factor,g*factor,b*factor,1); }
+function luma(hex){ const {r,g,b}=hexToRgb(hex); return 0.2126*r+0.7152*g+0.0722*b; }
+
+function drawCell(x,y,color){
+  const px = x*CELL, py=y*CELL;
+  // Base fill
+  ctx.fillStyle = color; ctx.fillRect(px,py,CELL,CELL);
+  // Subtle inner shading: top/left highlight + bottom shadow
+  const topH = Math.max(2, Math.floor(CELL*0.30));
+  const sideW = Math.max(2, Math.floor(CELL*0.18));
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(px, py, CELL, topH); // top glow
+  ctx.fillRect(px, py, sideW, CELL); // left glow
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(px, py+CELL-topH, CELL, topH); // bottom shadow
+  // Per-block outline: darker for most; neutral gray for very light blocks
+  const outline = luma(color)>220 ? 'rgba(120,130,140,0.9)' : darken(color, 0.66);
+  ctx.strokeStyle = outline; ctx.lineWidth = 1.25; ctx.strokeRect(px+0.5,py+0.5,CELL-1,CELL-1);
+}
+
+function drawGrid(){ ctx.fillStyle='#0d1017'; ctx.fillRect(0,0,W,H); ctx.strokeStyle='#141826'; ctx.lineWidth=1; for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,H); ctx.stroke(); } for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(W,y*CELL); ctx.stroke(); } }
+function drawMatrix(m, offset, ghost=false){ m.forEach((row,y)=>{ row.forEach((v,x)=>{ if(v!==0){ const color = ghost? COLOR.ghost : COLOR.blocks[(v-1)%COLOR.blocks.length]; if(ghost){ // ghost draws simple translucent cells, no shading
+          const px=(x+offset.x)*CELL, py=(y+offset.y)*CELL; ctx.fillStyle=color; ctx.fillRect(px,py,CELL,CELL); ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.strokeRect(px+0.5,py+0.5,CELL-1,CELL-1);
+        } else {
+          drawCell(x+offset.x, y+offset.y, color);
+        }
+      } }) }) }
+function ghostPosition(p){ const g={matrix:p.matrix, pos:{x:p.pos.x,y:p.pos.y}}; while(!collide(grid,{matrix:g.matrix,pos:{x:g.pos.x,y:g.pos.y+1}})) g.pos.y++; return g; }
+function draw(){ drawGrid(); grid.forEach((row,y)=>row.forEach((v,x)=>{ if(v!==0) drawCell(x,y,COLOR.blocks[(v-1)%COLOR.blocks.length]); })); if(piece){ if(showGhost){ const g=ghostPosition(piece); drawMatrix(g.matrix,g.pos,true); } drawMatrix(piece.matrix,piece.pos,false); } }
+
+function update(t=0){ const delta=t-lastTime; lastTime=t; if(running){ dropCounter+=delta; if(dropCounter>dropInterval) drop(); } draw(); requestAnimationFrame(update); }
+function drop(){ if(!piece) return; piece.pos.y++; if(collide(grid,piece)){ piece.pos.y--; merge(grid,piece); sweep(); newPiece(); } dropCounter=0; }
+
+function move(dir){ piece.pos.x += dir; if(collide(grid,piece)) piece.pos.x -= dir; }
+function rotatePiece(dir){ const prev=piece.matrix; const tried = dir>0 ? rotCW(prev) : rotCCW(prev); piece.matrix = tried; const pos = piece.pos.x; let offset=1; while (collide(grid, piece)){ piece.pos.x += offset; offset = -(offset + (offset>0 ? 1 : -1)); if (offset > piece.matrix[0].length){ piece.matrix = prev; piece.pos.x = pos; return; } } }
+
+function updateHUD(){ $('#score').textContent=score; $('#lines').textContent=lines; $('#level').textContent=level; }
+const keys=Object.create(null);
+
+document.addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  keys[e.key]=true;
+  // Always allow pause/resume toggle
+  if (e.key==='p' || e.key==='P'){ running=!running; toast(running?'Resume':'Paused'); return; }
+  // NEW: allow ghost toggle regardless of pause state
+  if (e.key==='g' || e.key==='G'){ setGhost(!showGhost); return; }
+  // When paused, allow only Reset
+  if (!running){ if (e.key==='r' || e.key==='R') reset(); return; }
+  if (e.key==='ArrowLeft') move(-1);
+  else if (e.key==='ArrowRight') move(1);
+  else if (e.key==='ArrowDown'){ drop(); score++; updateHUD(); }
+  else if (e.key===' '){ hardDrop(); }
+  else if (e.key==='x' || e.key==='X' || e.key==='ArrowUp'){ rotatePiece(1); }
+  else if (e.key==='z' || e.key==='Z'){ rotatePiece(-1); }
+  else if (e.key==='r' || e.key==='R'){ reset(); }
+  else if (e.key==='h' || e.key==='H'){ if(aiAssist) autoPlace(); }
+  konamiFeed(e.key); aiFeed(e.key);
+});
+
+document.addEventListener('keyup', e=>{ keys[e.key]=false; });
+
+function hardDrop(){ if(!piece) return; let rows=0; while(!collide(grid,{matrix:piece.matrix,pos:{x:piece.pos.x,y:piece.pos.y+1}})){ piece.pos.y++; rows++; score += 2; } if(rows>0) updateHUD(); drop(); }
+
+function suggestPlacement(){ let best=null, bestScore=-Infinity; const rotations=[piece.matrix]; for(let r=0;r<3;r++) rotations.push(rotCW(rotations[rotations.length-1])); const uniq=uniqueMatrices(rotations); for(const mat of uniq){ const w=mat[0].length; for(let x=-2;x<COLS-w+2;x++){ const sim=simulateDrop(mat,x); if(!sim) continue; const s=evaluate(sim.grid); const sc=s.lines*1000 - s.holes*50 - s.bumpiness*5 - s.height*2; if(sc>bestScore){ bestScore=sc; best={matrix:mat,x:sim.x,y:sim.y}; } } } return best; }
+function simulateDrop(mat,x0){ const p={matrix:mat,pos:{x:x0,y:0}}; const width=mat[0].length; if(p.pos.x<0) p.pos.x=0; if(p.pos.x>COLS-width) p.pos.x=COLS-width; while(collide(grid,p) && p.pos.x<COLS-width) p.pos.x++; while(!collide(grid,{matrix:mat,pos:{x:p.pos.x,y:p.pos.y+1}})){ p.pos.y++; if(p.pos.y>ROWS) break; } if(p.pos.y===0 && collide(grid,p)) return null; const g=grid.map(r=>r.slice()); mat.forEach((row,y)=>row.forEach((v,x)=>{ if(!v) return; const gy=y+p.pos.y, gx=x+p.pos.x; if(g[gy] && g[gy][gx] !== undefined) g[gy][gx]=v; })); return {grid:g, x:p.pos.x, y:p.pos.y}; }
+function evaluate(g){ let holes=0, height=0, bump=0, prev=-1, linesFull=0; for(let y=0;y<ROWS;y++){ if(g[y].every(v=>v!==0)) linesFull++; } for(let x=0;x<COLS;x++){ let colH=0, seen=false; for(let y=0;y<ROWS;y++){ if(g[y][x]!==0){ seen=true; colH=ROWS-y; } else if(seen) holes++; } height+=colH; if(prev!==-1) bump+=Math.abs(prev-colH); prev=colH; } return {holes:holes, height:height, bumpiness:bump, lines:linesFull}; }
+function copy(m){ return m.map(r=>r.slice()); }
+function uniqueMatrices(arr){ const seen=new Set(), out=[]; for(const m of arr){ const key=JSON.stringify(m); if(!seen.has(key)){ seen.add(key); out.push(m); } } return out; }
+function autoPlace(){ const s=suggestPlacement(); if(!s) return; let safety=10; while(JSON.stringify(piece.matrix)!==JSON.stringify(s.matrix) && safety--){ rotatePiece(1); } while(piece.pos.x<s.x) move(1); while(piece.pos.x>s.x) move(-1); while(piece.pos.y<s.y) drop(); }
+
+const KONAMI=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a']; let konamiIdx=0;
+function konamiFeed(key){ const normalized=key.length===1?key.toLowerCase():key; if(normalized===KONAMI[konamiIdx]){ konamiIdx++; if(konamiIdx===KONAMI.length){ konamiIdx=0; konamiActive=!konamiActive; document.body.style.background = konamiActive ? `radial-gradient(1200px 800px at 20% -10%, rgba(246,151,23,0.14), transparent 60%),\n           conic-gradient(from 0deg at 50% 50%, rgba(246,151,23,.05), transparent 40%),\n           linear-gradient(#0b0d12,#0a0b0f 50%, #0b0d12)` : ''; toast(konamiActive?'Spiral of Success: ON':'Spiral of Success: OFF'); } } else { konamiIdx=0; } }
+function confettiSpiral(){ if(!konamiActive) return; const cx=innerWidth/2, cy=innerHeight/2; const parts=120, maxR=Math.min(innerWidth,innerHeight)*0.35; let a=0; const pieces=[]; for(let i=0;i<parts;i++){ pieces.push({ r:10+(i/parts)*maxR, ang:a+=(Math.PI*2)/18, life:600+Math.random()*400, hue:30+Math.random()*25 }); } const start=performance.now(); (function anim(t){ const dt=t-start; fx.clearRect(0,0,fxCanvas.width,fxCanvas.height); pieces.forEach(p=>{ const pr=p.r+Math.sin((dt/400)+p.ang)*6; const x=cx+pr*Math.cos(p.ang+dt/800); const y=cy+pr*Math.sin(p.ang+dt/800); fx.fillStyle=`hsla(${p.hue},95%,60%,${Math.max(0,1-dt/p.life)})`; fx.beginPath(); fx.arc(x,y,2,0,Math.PI*2); fx.fill(); }); if(dt<900) requestAnimationFrame(anim); })(performance.now()); }
+
+// Click support on pills
+ghostPill.addEventListener('click', ()=> setGhost(!showGhost));
+aiPill.addEventListener('click', ()=> { aiAssist=!aiAssist; aiPill.classList.toggle('on', aiAssist); toast(aiAssist? 'AI Assist: ON (press H)' : 'AI Assist: OFF'); });
+
+let aiSeq=[]; function aiFeed(key){ aiSeq.push(key.toLowerCase()); aiSeq=aiSeq.slice(-2); if(aiSeq[0]==='a' && aiSeq[1]==='i'){ aiAssist=!aiAssist; aiPill.classList.toggle('on', aiAssist); toast(aiAssist? 'AI Assist: ON (press H)' : 'AI Assist: OFF'); } }
+function reset(){ grid=createMatrix(COLS,ROWS); nextQueue=[]; refill(); piece=null; newPiece(); score=0; lines=0; level=1; dropInterval=800; running=true; updateHUD(); if(showGhost!==true) setGhost(true); }
+reset(); update();
+</script>
+</body>
+</html>
