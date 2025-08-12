@@ -136,7 +136,7 @@ function drawCell(x,y,color){
   // Base fill
   ctx.fillStyle = color; ctx.fillRect(px,py,CELL,CELL);
   // Subtle inner shading: top/left highlight + bottom shadow
-  const topH = Math.max(2, Math.floor(CELL*0.30));
+  const topH = Math.max(2, Math.floor(CELL*0.18));
   const sideW = Math.max(2, Math.floor(CELL*0.18));
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
   ctx.fillRect(px, py, CELL, topH); // top glow
