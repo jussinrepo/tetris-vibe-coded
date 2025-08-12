@@ -1,7 +1,24 @@
 # Vibe-coded Tetris — Almost oneshotting a browser puzzle game
 
-Version 1.0.6
+<img width="836" height="810" alt="image" src="https://github.com/user-attachments/assets/1c2e8a34-874f-4223-a2a4-c757843944e6" />
 
+**Version 1.0.6**
+
+## Features
+- Standard Tetris clone at it's core
+- Ghost guide mode, which shows where your block is gonna land
+- AI Assist mode, which places blocks for you. Aka the game plays itself..
+- Konami code unleashes spectacular visual effects
+
+## Why?
+- To try out whether the (at the point of typing this) newly launched OpenAI's GPT-5 is as good in vibe-coding as they claim. And better than Claude's models..
+- This was purely to showcase the capabilities of low-effort vibe-coding. It worked, rather well. Yet I don't even like the traditional Tetris as a pastime...
+
+## How?
+- I enabled GPT-5 mode in Microsoft 365 Copilot and prompted it to: "vibe-code me a tetris game using html and javascript. Give it a *insert company name here* twist, using the company's brand color and some easter egg in the source code and the gameplay from the website *companywebsite.com*"
+- Well, it took 2 more prompts to get everything running without errors and 4 more prompts to add few visual and functional features.
+- That's it! Try it yourself with the free ChatGPT UI and reimagine your favorite low-effort game with ease!
+ 
 ## What’s new
 - **Ghost Guide toggle**: press **G** or click the **Ghost Guide** pill to show/hide the grey landing preview.
 
